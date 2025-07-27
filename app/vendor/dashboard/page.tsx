@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/contexts/auth-context"
+import ProductList from "@/components/shared/product-list"
 
 export default function VendorDashboard() {
   const { user, logout, isLoading } = useAuth()
@@ -564,6 +565,11 @@ export default function VendorDashboard() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* All Products Section */}
+        <div className="mt-8">
+          <ProductList userRole="vendor" userId={user.id} />
         </div>
       </div>
     </div>

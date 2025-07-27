@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useAuth } from "@/contexts/auth-context"
+import ProductList from "@/components/shared/product-list"
 
 export default function SupplierDashboard() {
   const { user, logout, isLoading } = useAuth()
@@ -439,6 +440,11 @@ export default function SupplierDashboard() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* All Products Section */}
+        <div className="mt-8">
+          <ProductList userRole="supplier" userId={user.id} />
         </div>
       </div>
     </div>
