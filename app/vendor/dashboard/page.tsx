@@ -40,6 +40,35 @@ export default function VendorDashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [isInitializing, setIsInitializing] = useState(true)
+  const [recentOrders, setRecentOrders] = useState([
+    {
+      id: "ORD001",
+      supplier: "Fresh Vegetables Co.",
+      items: "Onions, Tomatoes",
+      amount: "₹450",
+      status: "delivered",
+      date: "2024-01-15",
+      image: "/placeholder.svg?height=40&width=40",
+    },
+    {
+      id: "ORD002",
+      supplier: "Spice Masters",
+      items: "Turmeric, Red Chili",
+      amount: "₹320",
+      status: "in-transit",
+      date: "2024-01-14",
+      image: "/placeholder.svg?height=40&width=40",
+    },
+    {
+      id: "ORD003",
+      supplier: "Oil Distributors",
+      items: "Cooking Oil",
+      amount: "₹800",
+      status: "pending",
+      date: "2024-01-13",
+      image: "/placeholder.svg?height=40&width=40",
+    },
+  ])
 
   useEffect(() => {
     // Add delay to allow auth context to initialize
@@ -48,6 +77,32 @@ export default function VendorDashboard() {
     }, 1000)
 
     return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    // Listen for new orders placed from ProductList
+    const handleOrderPlaced = (event: CustomEvent) => {
+      const newOrder = event.detail
+      if (newOrder) {
+        const orderForDisplay = {
+          id: newOrder.orderId || `ORD${Date.now()}`,
+          supplier: newOrder.productName || 'Unknown Product',
+          items: `${newOrder.quantity} ${newOrder.unitPrice ? 'units' : 'items'}`,
+          amount: `₹${newOrder.totalAmount?.toLocaleString() || '0'}`,
+          status: newOrder.status || 'pending',
+          date: new Date().toLocaleDateString('en-IN'),
+          image: "/placeholder.svg?height=40&width=40",
+        }
+        
+        setRecentOrders(prevOrders => [orderForDisplay, ...prevOrders.slice(0, 2)])
+      }
+    }
+
+    window.addEventListener('orderPlaced', handleOrderPlaced as EventListener)
+    
+    return () => {
+      window.removeEventListener('orderPlaced', handleOrderPlaced as EventListener)
+    }
   }, [])
 
   useEffect(() => {
@@ -98,36 +153,7 @@ export default function VendorDashboard() {
       .slice(0, 2)
   }
 
-  // Mock data with enhanced information
-  const recentOrders = [
-    {
-      id: "ORD001",
-      supplier: "Fresh Vegetables Co.",
-      items: "Onions, Tomatoes",
-      amount: "₹450",
-      status: "delivered",
-      date: "2024-01-15",
-      image: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: "ORD002",
-      supplier: "Spice Masters",
-      items: "Turmeric, Red Chili",
-      amount: "₹320",
-      status: "in-transit",
-      date: "2024-01-14",
-      image: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: "ORD003",
-      supplier: "Oil Distributors",
-      items: "Cooking Oil",
-      amount: "₹800",
-      status: "pending",
-      date: "2024-01-13",
-      image: "/placeholder.svg?height=40&width=40",
-    },
-  ]
+  // Mock data is now handled in state above
 
   const featuredProducts = [
     {

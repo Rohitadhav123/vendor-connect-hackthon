@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Filter, Package, MapPin, Star, ShoppingCart, Eye } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Search, Filter, Package, MapPin, Star, ShoppingCart, Eye, Plus, Minus } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Product {
@@ -44,6 +46,17 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [orderQuantity, setOrderQuantity] = useState(1)
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false)
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    address: '',
+    city: '',
+    state: '',
+    pincode: ''
+  })
+  const [orderNotes, setOrderNotes] = useState('')
 
   const categories = [
     { value: "all", label: "All Categories" },
@@ -105,6 +118,69 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch()
+    }
+  }
+
+  const handlePlaceOrder = async () => {
+    if (!selectedProduct || !userId) {
+      toast.error('Unable to place order. Please try again.')
+      return
+    }
+
+    setIsPlacingOrder(true)
+    
+    try {
+      // Validate delivery address
+      if (!deliveryAddress.address || !deliveryAddress.city || !deliveryAddress.state || !deliveryAddress.pincode) {
+        toast.error('Please fill in all delivery address fields')
+        return
+      }
+
+      // Create order object
+      const orderData = {
+        productId: selectedProduct.id,
+        quantity: orderQuantity,
+        deliveryAddress,
+        notes: orderNotes
+      }
+
+      // Get auth token from localStorage or context
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        toast.error('Authentication required. Please log in again.')
+        return
+      }
+
+      // API call to place order
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        toast.success(`Order placed successfully! Order ID: ${result.order?.orderId || 'N/A'}`)
+        setIsOrderDialogOpen(false)
+        setSelectedProduct(null)
+        setOrderQuantity(1)
+        setDeliveryAddress({ address: '', city: '', state: '', pincode: '' })
+        setOrderNotes('')
+        
+        // Trigger a refresh of the vendor dashboard to show the new order
+        window.dispatchEvent(new CustomEvent('orderPlaced', { detail: result.order }))
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to place order')
+      }
+    } catch (error) {
+      console.error('Error placing order:', error)
+      toast.error('Failed to place order. Please try again.')
+    } finally {
+      setIsPlacingOrder(false)
     }
   }
 
@@ -245,10 +321,174 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
                     <div className="flex gap-2">
                       {userRole === 'vendor' ? (
                         <>
-                          <Button size="sm" className="flex-1">
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Order Now
-                          </Button>
+                          <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button 
+                                size="sm" 
+                                className="flex-1"
+                                onClick={() => {
+                                  setSelectedProduct(product)
+                                  setOrderQuantity(product.minOrderQuantity)
+                                }}
+                              >
+                                <ShoppingCart className="w-4 h-4 mr-2" />
+                                Order Now
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>Place Order</DialogTitle>
+                                <DialogDescription>
+                                  Order {selectedProduct?.name} from {selectedProduct?.supplierBusinessName}
+                                </DialogDescription>
+                              </DialogHeader>
+                              {selectedProduct && (
+                                <div className="grid gap-4 py-4">
+                                  <div className="flex items-center gap-4">
+                                    <img
+                                      src={selectedProduct.images?.[0] || "/placeholder.svg"}
+                                      alt={selectedProduct.name}
+                                      className="w-16 h-16 rounded-lg object-cover"
+                                    />
+                                    <div className="flex-1">
+                                      <h3 className="font-semibold">{selectedProduct.name}</h3>
+                                      <p className="text-sm text-gray-600">{selectedProduct.description}</p>
+                                      <p className="font-bold text-green-600">
+                                        {formatPrice(selectedProduct.price, selectedProduct.unit)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="quantity" className="text-right">
+                                      Quantity
+                                    </Label>
+                                    <div className="col-span-3 flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setOrderQuantity(Math.max(selectedProduct.minOrderQuantity, orderQuantity - 1))}
+                                        disabled={orderQuantity <= selectedProduct.minOrderQuantity}
+                                      >
+                                        <Minus className="h-4 w-4" />
+                                      </Button>
+                                      <Input
+                                        id="quantity"
+                                        type="number"
+                                        value={orderQuantity}
+                                        onChange={(e) => setOrderQuantity(Math.max(selectedProduct.minOrderQuantity, parseInt(e.target.value) || selectedProduct.minOrderQuantity))}
+                                        className="text-center h-8 w-20"
+                                        min={selectedProduct.minOrderQuantity}
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setOrderQuantity(orderQuantity + 1)}
+                                      >
+                                        <Plus className="h-4 w-4" />
+                                      </Button>
+                                      <span className="text-sm text-gray-500 ml-2">{selectedProduct.unit}</span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="text-sm text-gray-600">
+                                    <p>Minimum order: {selectedProduct.minOrderQuantity} {selectedProduct.unit}</p>
+                                  </div>
+                                  
+                                  {/* Delivery Address Section */}
+                                  <div className="space-y-4 border-t pt-4">
+                                    <h4 className="font-semibold text-sm">Delivery Address</h4>
+                                    <div className="grid gap-3">
+                                      <div>
+                                        <Label htmlFor="address" className="text-sm">Street Address</Label>
+                                        <Input
+                                          id="address"
+                                          placeholder="Enter your street address"
+                                          value={deliveryAddress.address}
+                                          onChange={(e) => setDeliveryAddress(prev => ({ ...prev, address: e.target.value }))}
+                                          className="mt-1"
+                                        />
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <Label htmlFor="city" className="text-sm">City</Label>
+                                          <Input
+                                            id="city"
+                                            placeholder="City"
+                                            value={deliveryAddress.city}
+                                            onChange={(e) => setDeliveryAddress(prev => ({ ...prev, city: e.target.value }))}
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="state" className="text-sm">State</Label>
+                                          <Input
+                                            id="state"
+                                            placeholder="State"
+                                            value={deliveryAddress.state}
+                                            onChange={(e) => setDeliveryAddress(prev => ({ ...prev, state: e.target.value }))}
+                                            className="mt-1"
+                                          />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="pincode" className="text-sm">Pincode</Label>
+                                        <Input
+                                          id="pincode"
+                                          placeholder="Pincode"
+                                          value={deliveryAddress.pincode}
+                                          onChange={(e) => setDeliveryAddress(prev => ({ ...prev, pincode: e.target.value }))}
+                                          className="mt-1"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Notes Section */}
+                                  <div className="space-y-2">
+                                    <Label htmlFor="notes" className="text-sm">Order Notes (Optional)</Label>
+                                    <Input
+                                      id="notes"
+                                      placeholder="Any special instructions or notes"
+                                      value={orderNotes}
+                                      onChange={(e) => setOrderNotes(e.target.value)}
+                                    />
+                                  </div>
+                                  
+                                  <div className="border-t pt-4">
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-semibold">Total Amount:</span>
+                                      <span className="font-bold text-lg text-green-600">
+                                        ₹{(selectedProduct.price * orderQuantity).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              <DialogFooter>
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  onClick={() => setIsOrderDialogOpen(false)}
+                                  disabled={isPlacingOrder}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  type="button" 
+                                  onClick={handlePlaceOrder}
+                                  disabled={isPlacingOrder}
+                                  className="bg-green-600 hover:bg-green-700"
+                                >
+                                  {isPlacingOrder ? "Placing Order..." : "Place Order"}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
                           <Button size="sm" variant="outline">
                             <Eye className="w-4 h-4" />
                           </Button>
