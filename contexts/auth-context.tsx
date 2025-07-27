@@ -60,9 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string, role: 'vendor' | 'supplier'): Promise<boolean> => {
+    console.log('🔐 AUTH CONTEXT: Starting login process')
     setIsLoading(true)
     
     try {
+      console.log('📡 AUTH CONTEXT: Making API call to /api/auth/login')
+      console.log('📦 AUTH CONTEXT: Sending data:', { email, role, password: '[HIDDEN]' })
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -71,33 +75,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password, role }),
       })
 
+      console.log('📨 AUTH CONTEXT: Response status:', response.status)
+      console.log('📨 AUTH CONTEXT: Response ok:', response.ok)
+      
       const data = await response.json()
+      console.log('📋 AUTH CONTEXT: Response data:', data)
 
       if (response.ok) {
-        // Store token and user data
+        console.log('✅ AUTH CONTEXT: Login successful, storing user data')
+        
+        // Store token and user data in both localStorage and cookies
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
+        
+        // Also store in cookies for middleware access
+        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
+        
         setUser(data.user)
         
+        console.log('💾 AUTH CONTEXT: User data stored in localStorage and cookies')
+        console.log('👤 AUTH CONTEXT: User state updated:', data.user)
+        
         toast.success(`Welcome back, ${data.user.name}!`)
+        console.log('✅ AUTH CONTEXT: Returning true for successful login')
         return true
       } else {
+        console.log('❌ AUTH CONTEXT: Login failed with error:', data.error)
         toast.error(data.error || 'Login failed')
         return false
       }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ AUTH CONTEXT: Login error:', error)
       toast.error('Network error. Please try again.')
       return false
     } finally {
+      console.log('🏁 AUTH CONTEXT: Login process completed, setting loading to false')
       setIsLoading(false)
     }
   }
 
   const signup = async (userData: SignupData): Promise<boolean> => {
+    console.log('🔐 AUTH CONTEXT: Starting signup process')
     setIsLoading(true)
     
     try {
+      console.log('📡 AUTH CONTEXT: Making API call to /api/auth/signup')
+      console.log('📦 AUTH CONTEXT: Sending data:', { ...userData, password: '[HIDDEN]' })
+      
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
@@ -106,25 +130,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify(userData),
       })
 
+      console.log('📨 AUTH CONTEXT: Response status:', response.status)
+      console.log('📨 AUTH CONTEXT: Response ok:', response.ok)
+      
       const data = await response.json()
+      console.log('📋 AUTH CONTEXT: Response data:', data)
 
       if (response.ok) {
-        // Store token and user data
+        console.log('✅ AUTH CONTEXT: Signup successful, storing user data')
+        
+        // Store token and user data in both localStorage and cookies
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
+        
+        // Also store in cookies for middleware access
+        document.cookie = `token=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
+        
         setUser(data.user)
         
+        console.log('💾 AUTH CONTEXT: User data stored in localStorage and cookies')
+        console.log('👤 AUTH CONTEXT: User state updated:', data.user)
+        
         toast.success(`Account created successfully! Welcome, ${data.user.name}!`)
+        console.log('✅ AUTH CONTEXT: Returning true for successful signup')
         return true
       } else {
+        console.log('❌ AUTH CONTEXT: Signup failed with error:', data.error)
         toast.error(data.error || 'Signup failed')
         return false
       }
     } catch (error) {
-      console.error('Signup error:', error)
+      console.error('❌ AUTH CONTEXT: Signup error:', error)
       toast.error('Network error. Please try again.')
       return false
     } finally {
+      console.log('🏁 AUTH CONTEXT: Signup process completed, setting loading to false')
       setIsLoading(false)
     }
   }
@@ -132,6 +172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    
+    // Also remove from cookies
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
+    
     setUser(null)
     toast.success('Logged out successfully')
   }

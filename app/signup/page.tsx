@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,9 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Store, ShoppingCart, ArrowLeft } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import toast from "react-hot-toast"
 
 export default function SignupPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const { signup, isLoading } = useAuth()
   const [role, setRole] = useState<"vendor" | "supplier">("vendor")
   const [formData, setFormData] = useState({
     name: "",
@@ -44,12 +48,61 @@ export default function SignupPage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle signup logic here
-    console.log("Signup data:", { ...formData, role })
-    // Redirect to appropriate dashboard
-    window.location.href = role === "vendor" ? "/vendor/dashboard" : "/supplier/dashboard"
+    
+    // Validation
+    if (!formData.name || !formData.email || !formData.phone || !formData.password) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+    
+    if (!formData.agreeToTerms) {
+      toast.error('Please agree to the terms and conditions')
+      return
+    }
+    
+    console.log('🚀 Submitting signup data:', { ...formData, role, password: '[HIDDEN]' })
+    
+    try {
+      console.log('📞 Calling signup function...')
+      const success = await signup({
+        ...formData,
+        role
+      })
+      
+      console.log('📋 Signup function returned:', success)
+      
+      if (success) {
+        console.log('✅ Signup successful, determining role-based redirect')
+        console.log('🔄 Current URL before redirect:', window.location.href)
+        console.log('👤 SIGNUP PAGE: User role:', role)
+        
+        // Determine redirect URL based on role
+        const redirectUrl = role === 'vendor' ? '/vendor/dashboard' : '/supplier/dashboard'
+        console.log('🎯 SIGNUP PAGE: Redirecting to:', redirectUrl)
+        
+        // Try multiple redirect methods
+        try {
+          await router.push(redirectUrl)
+          console.log('✅ Router.push completed to', redirectUrl)
+        } catch (routerError) {
+          console.error('❌ Router.push failed:', routerError)
+          console.log('🔄 Trying window.location redirect...')
+          window.location.href = redirectUrl
+        }
+      } else {
+        console.log('❌ Signup returned false - registration failed')
+      }
+    } catch (error) {
+      console.error('❌ Signup error:', error)
+      toast.error('Failed to create account. Please try again.')
+    }
   }
 
   const states = [
@@ -336,9 +389,9 @@ export default function SignupPage() {
               <Button
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600"
-                disabled={!formData.agreeToTerms}
+                disabled={!formData.agreeToTerms || isLoading}
               >
-                Create Account
+                {isLoading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </form>
 

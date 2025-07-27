@@ -3,16 +3,20 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Store, ShoppingCart, ArrowLeft } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import toast from "react-hot-toast"
 
 export default function LoginPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const { login, isLoading } = useAuth()
   const [role, setRole] = useState<"vendor" | "supplier">("vendor")
   const [formData, setFormData] = useState({
     email: "",
@@ -30,12 +34,62 @@ export default function LoginPage() {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle login logic here
-    console.log("Login data:", { ...formData, role })
-    // Redirect to appropriate dashboard
-    window.location.href = role === "vendor" ? "/vendor/dashboard" : "/supplier/dashboard"
+    
+    // Validation
+    if (!formData.email || !formData.password) {
+      toast.error('Please fill in all fields')
+      return
+    }
+    
+    console.log('🔐 Attempting login:', { email: formData.email, role, password: '[HIDDEN]' })
+    
+    try {
+      console.log('📞 LOGIN PAGE: Calling login function...')
+      const success = await login(formData.email, formData.password, role)
+      
+      console.log('📋 LOGIN PAGE: Login function returned:', success)
+      
+      if (success) {
+        console.log('✅ LOGIN PAGE: Login successful, determining role-based redirect')
+        console.log('🔄 LOGIN PAGE: Current URL before redirect:', window.location.href)
+        console.log('👤 LOGIN PAGE: User role:', role)
+        
+        // Determine redirect URL based on role
+        const redirectUrl = role === 'vendor' ? '/vendor/dashboard' : '/supplier/dashboard'
+        console.log('🎯 LOGIN PAGE: Redirecting to:', redirectUrl)
+        
+        // Add delay to ensure authentication state is set
+        console.log('⏱️ LOGIN PAGE: Waiting 500ms before redirect...')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Try multiple redirect methods with better error handling
+        try {
+          console.log('🔄 LOGIN PAGE: Attempting router.push...')
+          await router.push(redirectUrl)
+          console.log('✅ LOGIN PAGE: Router.push completed to', redirectUrl)
+          
+          // Verify redirect worked
+          setTimeout(() => {
+            if (window.location.pathname !== redirectUrl) {
+              console.log('⚠️ LOGIN PAGE: Router.push may have failed, trying window.location...')
+              window.location.href = redirectUrl
+            }
+          }, 1000)
+          
+        } catch (routerError) {
+          console.error('❌ LOGIN PAGE: Router.push failed:', routerError)
+          console.log('🔄 LOGIN PAGE: Trying window.location redirect...')
+          window.location.href = redirectUrl
+        }
+      } else {
+        console.log('❌ LOGIN PAGE: Login returned false - authentication failed')
+      }
+    } catch (error) {
+      console.error('❌ LOGIN PAGE: Login error:', error)
+      toast.error('Login failed. Please try again.')
+    }
   }
 
   return (

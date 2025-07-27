@@ -2,32 +2,41 @@
 import mongoose from 'mongoose';
 import { Schema, Document, Model } from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://adhavrohit37:testing123@cluster0.5kaa2ks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://adhavrohit37:testing123@cluster0.5kaa2ks.mongodb.net/vendor_connect?retryWrites=true&w=majority&appName=Cluster0';
 
 // Connection state
 let isConnected = false;
 
 export async function connectToDatabase(): Promise<void> {
-  if (isConnected) {
+  if (mongoose.connection.readyState === 1) {
     console.log('Already connected to MongoDB');
+    return;
+  }
+
+  if (mongoose.connection.readyState === 2) {
+    console.log('MongoDB connection in progress...');
     return;
   }
 
   try {
     console.log('Connecting to MongoDB Atlas...');
+    console.log('Connection string:', MONGODB_URI.replace(/:\/\/([^:]+):([^@]+)@/, '://***:***@'));
     
     await mongoose.connect(MONGODB_URI, {
       bufferCommands: false,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      family: 4, // Use IPv4, skip trying IPv6
     });
     
     isConnected = true;
     console.log('Successfully connected to MongoDB Atlas');
+    console.log('Database name:', mongoose.connection.db?.databaseName);
     
   } catch (error) {
     console.error('Failed to connect to MongoDB:', error);
+    isConnected = false;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(`Database connection failed: ${errorMessage}`);
   }

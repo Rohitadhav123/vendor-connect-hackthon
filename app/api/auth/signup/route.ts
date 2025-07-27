@@ -4,7 +4,9 @@ import { hashPassword, generateToken, validateEmail, validatePassword, validateP
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== SIGNUP API CALLED ===');
     const body = await request.json();
+    console.log('Request body received:', { ...body, password: '[HIDDEN]', confirmPassword: '[HIDDEN]' });
     const {
       name,
       email,
@@ -82,14 +84,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Connect to database
+    console.log('Connecting to database...');
     await connectToDatabase();
+    console.log('Database connection established');
     
     // Check for existing email
+    console.log('Checking for existing email:', email.toLowerCase());
     const existingEmailUser = await User.findOne({ 
       email: email.toLowerCase() 
     });
     
     if (existingEmailUser) {
+      console.log('User with email already exists');
       return NextResponse.json(
         { error: 'An account with this email already exists' },
         { status: 409 }
@@ -97,11 +103,13 @@ export async function POST(request: NextRequest) {
     }
     
     // Check for existing phone
+    console.log('Checking for existing phone:', phone);
     const existingPhoneUser = await User.findOne({ 
       phone: phone 
     });
     
     if (existingPhoneUser) {
+      console.log('User with phone already exists');
       return NextResponse.json(
         { error: 'An account with this phone number already exists' },
         { status: 409 }
@@ -112,9 +120,10 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await hashPassword(password);
 
     // Create new user with Mongoose
+    console.log('Creating new user...');
     let savedUser;
     try {
-      const newUser = new User({
+      const userData = {
         name: name.trim(),
         email: email.toLowerCase().trim(),
         phone: phone.trim(),
@@ -128,15 +137,24 @@ export async function POST(request: NextRequest) {
         businessType: businessType.trim(),
         description: description?.trim() || '',
         isVerified: true, // Auto-verify for demo purposes
-      });
+      };
       
+      console.log('User data to save:', { ...userData, password: '[HIDDEN]' });
+      
+      const newUser = new User(userData);
       savedUser = await newUser.save();
-      console.log('User created successfully with ID:', savedUser._id?.toString());
+      
+      console.log('✅ User created successfully!');
+      console.log('User ID:', savedUser._id?.toString());
+      console.log('User email:', savedUser.email);
+      console.log('User name:', savedUser.name);
+      
     } catch (insertError) {
-      console.error('Error creating user:', insertError);
+      console.error('❌ Error creating user:', insertError);
       
       // Handle duplicate key errors specifically
       if (insertError instanceof Error && insertError.message.includes('duplicate key')) {
+        console.log('Duplicate key error detected');
         if (insertError.message.includes('email')) {
           return NextResponse.json(
             { error: 'An account with this email already exists' },
@@ -168,6 +186,7 @@ export async function POST(request: NextRequest) {
 
     const token = generateToken(authUser);
 
+    console.log('✅ Signup successful! Returning response...');
     return NextResponse.json({
       success: true,
       message: 'Account created successfully',
@@ -182,7 +201,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Signup error:', error);
+    console.error('❌ SIGNUP ERROR:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

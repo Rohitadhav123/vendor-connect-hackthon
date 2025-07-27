@@ -4,7 +4,9 @@ import { comparePassword, generateToken, validateEmail, AuthUser } from '@/lib/a
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== LOGIN API CALLED ===');
     const body = await request.json();
+    console.log('Login request:', { email: body.email, role: body.role, password: '[HIDDEN]' });
     const { email, password, role } = body;
 
     // Validation
@@ -30,16 +32,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Connect to database and find user
+    console.log('Connecting to database for login...');
     await connectToDatabase();
+    console.log('Database connected, searching for user...');
     
     let user;
     try {
+      console.log('Searching for user with email:', email.toLowerCase(), 'and role:', role);
       user = await User.findOne({ 
         email: email.toLowerCase(),
         role: role 
       });
+      
+      if (user) {
+        console.log('✅ User found:', { id: user._id, email: user.email, name: user.name });
+      } else {
+        console.log('❌ No user found with provided credentials');
+      }
     } catch (dbError) {
-      console.error('Database error during login:', dbError);
+      console.error('❌ Database error during login:', dbError);
       return NextResponse.json(
         { error: 'Login service temporarily unavailable' },
         { status: 503 }
@@ -55,11 +66,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
+    console.log('Verifying password...');
     let isPasswordValid: boolean;
     try {
       isPasswordValid = await comparePassword(password, user.password);
+      console.log('Password verification result:', isPasswordValid ? '✅ Valid' : '❌ Invalid');
     } catch (passwordError) {
-      console.error('Password verification error:', passwordError);
+      console.error('❌ Password verification error:', passwordError);
       return NextResponse.json(
         { error: 'Authentication service error' },
         { status: 500 }
@@ -67,6 +80,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (!isPasswordValid) {
+      console.log('❌ Login failed: Invalid password');
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -103,6 +117,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to update last login time:', updateError);
     }
 
+    console.log('✅ Login successful! Returning response...');
     return NextResponse.json({
       success: true,
       message: 'Login successful',
@@ -117,7 +132,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('❌ LOGIN ERROR:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

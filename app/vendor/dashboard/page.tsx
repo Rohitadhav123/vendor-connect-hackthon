@@ -1,8 +1,7 @@
 "use client"
 
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,14 +26,58 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function VendorDashboard() {
+  const { user, logout, isLoading } = useAuth()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [isInitializing, setIsInitializing] = useState(true)
+
+  useEffect(() => {
+    // Add delay to allow auth context to initialize
+    const timer = setTimeout(() => {
+      setIsInitializing(false)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    // Only redirect if not loading and not initializing and no user
+    if (!isLoading && !isInitializing && !user) {
+      console.log('🚫 VENDOR DASHBOARD: No authenticated user, redirecting to login')
+      router.push('/login')
+    } else if (user) {
+      console.log('✅ VENDOR DASHBOARD: User authenticated:', user.name)
+    }
+  }, [user, router, isLoading, isInitializing])
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
 
   // Mock data with enhanced information
   const recentOrders = [
@@ -131,12 +174,12 @@ export default function VendorDashboard() {
   ]
 
   const categories = [
-    { id: "all", name: "All Categories", count: 150, icon: "🍽️", color: "bg-gray-100" },
-    { id: "vegetables", name: "Vegetables", count: 45, icon: "🥬", color: "bg-green-100" },
-    { id: "spices", name: "Spices", count: 32, icon: "🌶️", color: "bg-red-100" },
-    { id: "grains", name: "Grains & Rice", count: 28, icon: "🌾", color: "bg-yellow-100" },
-    { id: "oil", name: "Cooking Oil", count: 15, icon: "🫒", color: "bg-orange-100" },
-    { id: "packaging", name: "Packaging", count: 30, icon: "📦", color: "bg-blue-100" },
+    { id: "all", name: "All Categories", count: 150, icon: "", color: "bg-gray-100" },
+    { id: "vegetables", name: "Vegetables", count: 45, icon: "", color: "bg-green-100" },
+    { id: "spices", name: "Spices", count: 32, icon: "", color: "bg-red-100" },
+    { id: "grains", name: "Grains & Rice", count: 28, icon: "", color: "bg-yellow-100" },
+    { id: "oil", name: "Cooking Oil", count: 15, icon: "", color: "bg-orange-100" },
+    { id: "packaging", name: "Packaging", count: 30, icon: "", color: "bg-blue-100" },
   ]
 
   const quickStats = [
@@ -211,16 +254,21 @@ export default function VendorDashboard() {
                   <Button variant="ghost" className="flex items-center gap-2 hover:bg-gray-50">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                      <AvatarFallback className="bg-orange-100 text-orange-600">RK</AvatarFallback>
+                      <AvatarFallback className="bg-orange-100 text-orange-600">{getInitials(user.name)}</AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
-                      <div className="text-sm font-medium">Raj Kumar</div>
-                      <div className="text-xs text-gray-500">Street Food Vendor</div>
+                      <div className="text-sm font-medium">{user.name}</div>
+                      <div className="text-xs text-gray-500">{user.businessName}</div>
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
                     <User className="w-4 h-4 mr-2" />
@@ -231,7 +279,7 @@ export default function VendorDashboard() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={logout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Logout
                   </DropdownMenuItem>
