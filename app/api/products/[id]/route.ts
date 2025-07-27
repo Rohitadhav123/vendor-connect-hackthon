@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCollection, COLLECTIONS, Product } from '@/lib/database';
+import { connectToDatabase, Product } from '@/lib/database';
 import { verifyToken, extractTokenFromHeader } from '@/lib/auth';
-import { ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
 
 // GET /api/products/[id] - Get single product
 export async function GET(
@@ -11,16 +11,16 @@ export async function GET(
   try {
     const { id } = params;
 
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: 'Invalid product ID' },
         { status: 400 }
       );
     }
 
-    const productsCollection = await getCollection(COLLECTIONS.PRODUCTS);
-    const product = await productsCollection.findOne({
-      _id: new ObjectId(id),
+    await connectToDatabase();
+    const product = await Product.findOne({
+      _id: id,
       isActive: true
     });
 
@@ -70,7 +70,7 @@ export async function PUT(
       );
     }
 
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: 'Invalid product ID' },
         { status: 400 }
@@ -93,11 +93,11 @@ export async function PUT(
       isActive
     } = body;
 
-    const productsCollection = await getCollection(COLLECTIONS.PRODUCTS);
+    await connectToDatabase();
     
     // Check if product exists and belongs to the supplier
-    const existingProduct = await productsCollection.findOne({
-      _id: new ObjectId(id),
+    const existingProduct = await Product.findOne({
+      _id: id,
       supplierId: user.id
     });
 
@@ -126,12 +126,13 @@ export async function PUT(
     if (tags) updateData.tags = tags;
     if (isActive !== undefined) updateData.isActive = isActive;
 
-    const result = await productsCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updateData }
+    const result = await Product.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true }
     );
 
-    if (result.matchedCount === 0) {
+    if (!result) {
       return NextResponse.json(
         { error: 'Product not found' },
         { status: 404 }
@@ -177,22 +178,23 @@ export async function DELETE(
       );
     }
 
-    if (!ObjectId.isValid(id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: 'Invalid product ID' },
         { status: 400 }
       );
     }
 
-    const productsCollection = await getCollection(COLLECTIONS.PRODUCTS);
+    await connectToDatabase();
     
     // Soft delete - set isActive to false
-    const result = await productsCollection.updateOne(
-      { _id: new ObjectId(id), supplierId: user.id },
-      { $set: { isActive: false, updatedAt: new Date() } }
+    const result = await Product.findOneAndUpdate(
+      { _id: id, supplierId: user.id },
+      { isActive: false, updatedAt: new Date() },
+      { new: true }
     );
 
-    if (result.matchedCount === 0) {
+    if (!result) {
       return NextResponse.json(
         { error: 'Product not found or you do not have permission to delete it' },
         { status: 404 }

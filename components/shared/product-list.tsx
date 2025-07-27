@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Search, Filter, Package, MapPin, Star, ShoppingCart, Eye, Plus, Minus } from "lucide-react"
+import { Search, Filter, Package, MapPin, Star, ShoppingCart, Eye, Plus, Minus, Trash2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 interface Product {
@@ -57,6 +57,9 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
     pincode: ''
   })
   const [orderNotes, setOrderNotes] = useState('')
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false)
 
   const categories = [
     { value: "all", label: "All Categories" },
@@ -145,7 +148,7 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
       }
 
       // Get auth token from localStorage or context
-      const token = localStorage.getItem('auth_token')
+      const token = localStorage.getItem('token')
       if (!token) {
         toast.error('Authentication required. Please log in again.')
         return
@@ -181,6 +184,52 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
       toast.error('Failed to place order. Please try again.')
     } finally {
       setIsPlacingOrder(false)
+    }
+  }
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete || !userId) {
+      toast.error('Unable to delete product. Please try again.')
+      return
+    }
+
+    setIsDeletingProduct(true)
+    
+    try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('token')
+      if (!token) {
+        toast.error('Authentication required. Please log in again.')
+        return
+      }
+
+      // API call to delete product
+      const response = await fetch(`/api/products/${productToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (response.ok) {
+        toast.success(`Product "${productToDelete.name}" deleted successfully!`)
+        setIsDeleteDialogOpen(false)
+        setProductToDelete(null)
+        
+        // Remove the deleted product from the local state
+        setProducts(prevProducts => prevProducts.filter(p => p.id !== productToDelete.id))
+        
+        // Refresh the product list
+        handleSearch()
+      } else {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete product')
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      toast.error('Failed to delete product. Please try again.')
+    } finally {
+      setIsDeletingProduct(false)
     }
   }
 
@@ -494,10 +543,80 @@ export default function ProductList({ userRole, userId }: ProductListProps) {
                           </Button>
                         </>
                       ) : (
-                        <Button size="sm" variant="outline" className="flex-1">
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="flex-1">
+                            <Eye className="w-4 h-4 mr-2" />
+                            View Details
+                          </Button>
+                          {/* Delete button for suppliers - only show for their own products */}
+                          {userRole === 'supplier' && product.supplierId === userId && (
+                            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => {
+                                    setProductToDelete(product)
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                  <DialogTitle>Delete Product</DialogTitle>
+                                  <DialogDescription>
+                                    Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                {productToDelete && (
+                                  <div className="grid gap-4 py-4">
+                                    <div className="flex items-center gap-4">
+                                      <img
+                                        src={productToDelete.images?.[0] || "/placeholder.svg"}
+                                        alt={productToDelete.name}
+                                        className="w-16 h-16 rounded-lg object-cover"
+                                      />
+                                      <div className="flex-1">
+                                        <h3 className="font-semibold">{productToDelete.name}</h3>
+                                        <p className="text-sm text-gray-600">{productToDelete.description}</p>
+                                        <p className="font-bold text-green-600">
+                                          {formatPrice(productToDelete.price, productToDelete.unit)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                      <p className="text-sm text-red-800">
+                                        <strong>Warning:</strong> Deleting this product will remove it permanently from the marketplace. 
+                                        Any pending orders for this product may be affected.
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
+                                <DialogFooter>
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    onClick={() => setIsDeleteDialogOpen(false)}
+                                    disabled={isDeletingProduct}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button 
+                                    type="button" 
+                                    onClick={handleDeleteProduct}
+                                    disabled={isDeletingProduct}
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                  >
+                                    {isDeletingProduct ? "Deleting..." : "Delete Product"}
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </div>
                       )}
                     </div>
                   </CardContent>
