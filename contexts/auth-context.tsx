@@ -9,6 +9,8 @@ interface User {
   email: string
   role: 'vendor' | 'supplier'
   businessName: string
+  city?: string
+  state?: string
 }
 
 interface AuthContextType {

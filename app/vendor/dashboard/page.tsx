@@ -375,7 +375,7 @@ export default function VendorDashboard() {
                 <img src="/placeholder.svg?height=200&width=200" alt="" className="w-48 h-48 object-cover" />
               </div>
               <div className="relative z-10">
-                <h1 className="text-3xl font-bold mb-2">Welcome back, Raj! 👋</h1>
+                <h1 className="text-3xl font-bold mb-2">Welcome back, {user.name}! 👋</h1>
                 <p className="text-orange-100 mb-4">
                   Ready to source the best ingredients for your delicious street food?
                 </p>

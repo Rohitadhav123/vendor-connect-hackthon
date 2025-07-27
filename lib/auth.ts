@@ -16,6 +16,8 @@ export interface AuthUser {
   name: string;
   role: 'vendor' | 'supplier';
   businessName: string;
+  city?: string;
+  state?: string;
 }
 
 export async function hashPassword(password: string): Promise<string> {

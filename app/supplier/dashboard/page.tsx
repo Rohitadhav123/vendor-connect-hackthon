@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,9 +34,70 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function SupplierDashboard() {
+  const { user, logout, isLoading } = useAuth()
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [isInitializing, setIsInitializing] = useState(true)
+
+  useEffect(() => {
+    // Add delay to allow auth context to initialize
+    const timer = setTimeout(() => {
+      setIsInitializing(false)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    // Only redirect if not loading and not initializing and no user
+    if (!isLoading && !isInitializing && !user) {
+      console.log('🚫 SUPPLIER DASHBOARD: No authenticated user, redirecting to login')
+      router.push('/login')
+    } else if (user) {
+      console.log('✅ SUPPLIER DASHBOARD: User authenticated:', user.name)
+      // Ensure supplier role
+      if (user.role !== 'supplier') {
+        console.log('⚠️ SUPPLIER DASHBOARD: User is not a supplier, redirecting to appropriate dashboard')
+        router.push(user.role === 'vendor' ? '/vendor/dashboard' : '/login')
+      }
+    }
+  }, [user, router, isLoading, isInitializing])
+
+  // Show loading while auth context initializes
+  if (isLoading || isInitializing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading if no user yet (but still initializing)
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>Authenticating...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  }
 
   // Mock data
   const stats = {
@@ -158,13 +220,21 @@ export default function SupplierDashboard() {
                   <Button variant="ghost" className="flex items-center gap-2">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                      <AvatarFallback>AM</AvatarFallback>
+                      <AvatarFallback className="bg-blue-100 text-blue-600">{getInitials(user.name)}</AvatarFallback>
                     </Avatar>
-                    <span className="hidden md:block">Amit Vegetables</span>
+                    <div className="hidden md:block text-left">
+                      <div className="text-sm font-medium">{user.name}</div>
+                      <div className="text-xs text-gray-500">{user.businessName}</div>
+                    </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>
                     <User className="w-4 h-4 mr-2" />
@@ -175,7 +245,7 @@ export default function SupplierDashboard() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={logout}>
                     <LogOut className="w-4 h-4 mr-2" />
                     Logout
                   </DropdownMenuItem>
@@ -189,8 +259,18 @@ export default function SupplierDashboard() {
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back, Amit! 👋</h1>
-          <p className="text-gray-600">Manage your products and orders from your supplier dashboard</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back, {user.name}! 👋</h1>
+              <p className="text-gray-600">Manage your products and orders from your supplier dashboard</p>
+            </div>
+            <Link href="/supplier/products/add">
+              <Button className="bg-blue-500 hover:bg-blue-600">
+                <Plus className="w-4 h-4 mr-2" />
+                Add New Product
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Stats Cards */}
