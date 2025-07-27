@@ -56,15 +56,33 @@ export default function VendorDashboard() {
       router.push('/login')
     } else if (user) {
       console.log('✅ VENDOR DASHBOARD: User authenticated:', user.name)
+      // Ensure vendor role
+      if (user.role !== 'vendor') {
+        console.log('⚠️ VENDOR DASHBOARD: User is not a vendor, redirecting to appropriate dashboard')
+        router.push(user.role === 'supplier' ? '/supplier/dashboard' : '/login')
+      }
     }
   }, [user, router, isLoading, isInitializing])
 
+  // Show loading while auth context initializes
+  if (isLoading || isInitializing) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p>Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading if no user yet (but still initializing)
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p>Authenticating...</p>
         </div>
       </div>
     )

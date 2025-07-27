@@ -41,25 +41,35 @@ export function middleware(request: NextRequest) {
   if (isProtectedRoute && token) {
     try {
       console.log('🔐 MIDDLEWARE: Verifying token for protected route')
+      console.log('🔐 MIDDLEWARE: Token preview:', token.substring(0, 20) + '...')
       const user = verifyToken(token)
+      console.log('🔐 MIDDLEWARE: Token verification result:', user ? 'Valid' : 'Invalid')
       if (!user) {
         console.log('🚫 MIDDLEWARE: Invalid token, redirecting to login')
-        return NextResponse.redirect(new URL('/login', request.url))
+        // Clear invalid token
+        const response = NextResponse.redirect(new URL('/login', request.url))
+        response.cookies.delete('token')
+        return response
       }
-      console.log('✅ MIDDLEWARE: Valid token for user:', user.name)
+      console.log('✅ MIDDLEWARE: Valid token for user:', user.name, 'role:', user.role)
     } catch (error) {
       console.log('🚫 MIDDLEWARE: Token verification failed:', error)
-      return NextResponse.redirect(new URL('/login', request.url))
+      // Clear invalid token
+      const response = NextResponse.redirect(new URL('/login', request.url))
+      response.cookies.delete('token')
+      return response
     }
   }
   
-  // If accessing auth routes with valid token, redirect to dashboard
+  // If accessing auth routes with valid token, redirect to role-specific dashboard
   if (isAuthRoute && token) {
     try {
       const user = verifyToken(token)
       if (user) {
-        console.log('✅ User already logged in, redirecting to dashboard')
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+        console.log('✅ User already logged in, redirecting to role-specific dashboard')
+        const dashboardUrl = user.role === 'vendor' ? '/vendor/dashboard' : '/supplier/dashboard'
+        console.log('🎯 MIDDLEWARE: Redirecting to:', dashboardUrl)
+        return NextResponse.redirect(new URL(dashboardUrl, request.url))
       }
     } catch (error) {
       // Invalid token, let them access auth routes

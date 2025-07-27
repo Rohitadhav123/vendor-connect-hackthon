@@ -3,10 +3,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from './database';
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
+const JWT_SECRET = process.env.JWT_SECRET || 'vendor-connect-default-jwt-secret-key-2024';
+
+if (!process.env.JWT_SECRET) {
   console.warn('JWT_SECRET not set in environment variables. Using default (not recommended for production)');
-  return 'your-secret-key-change-in-production';
-})();
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 export interface AuthUser {
@@ -42,9 +43,12 @@ export function generateToken(user: AuthUser): string {
 
 export function verifyToken(token: string): AuthUser | null {
   try {
+    console.log('🔍 AUTH: Verifying token with JWT_SECRET length:', JWT_SECRET.length)
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+    console.log('✅ AUTH: Token verified successfully for user:', decoded.name)
     return decoded;
   } catch (error) {
+    console.log('❌ AUTH: Token verification failed:', error instanceof Error ? error.message : error)
     return null;
   }
 }
